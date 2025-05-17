@@ -1,0 +1,103 @@
+
+<!DOCTYPE html>
+
+<html lang="pt-br">
+<head>
+<meta charset="utf-8"/>
+<title>Painel de Administração</title>
+<style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #007bff;
+            color: white;
+        }
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        button {
+            padding: 4px 8px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        form {
+            display: inline;
+        }
+        .senha-secreta {
+            font-family: monospace;
+            color: #6c757d;
+        }
+    </style>
+<script>
+        function toggleSenha(id) {
+            var campo = document.getElementById("senha-" + id);
+            if (campo.dataset.original === "") {
+                campo.textContent = campo.dataset.senha;
+                campo.dataset.original = campo.dataset.senha;
+            } else {
+                campo.textContent = "••••••••";
+                campo.dataset.original = "";
+            }
+        }
+    </script>
+</head>
+<body>
+<h2>Painel de Controle de Usuários</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Nome</th>
+<th>E-mail</th>
+<th>ID da Máquina</th><th>Empresa</th>
+<th>Plano</th>
+<th>Status</th>
+<th>Senha</th>
+<th>Ações</th>
+</tr>
+</thead>
+<tbody>
+            {% for u in usuarios %}
+            <tr>
+<td>{{ u.id }}</td>
+<td>{{ u.nome }}</td>
+<td>{{ u.email }}</td>
+<td>{{ u.id_maquina or 'Não vinculado' }}</td><td>{{ u.empresa }}</td>
+<td>{{ u.plano }}</td>
+<td>{{ u.status }}</td>
+<td>
+<span class="senha-secreta" data-original="" data-senha="{{ u.senha }}" id="senha-{{ u.id }}">••••••••</span>
+<button onclick="toggleSenha({{ u.id }})" type="button">👁️</button>
+</td>
+<td>
+<form action="/aprovar/{{ u.id }}" method="post">
+<button title="Aprovar">✅</button>
+</form>
+<form action="/rejeitar/{{ u.id }}" method="post">
+<button title="Rejeitar">❌</button>
+</form>
+<form action="/resetar/{{ u.id }}" method="post">
+<button title="Resetar senha">🔁</button>
+</form>
+<form action="/excluir/{{ u.id }}" method="post" onsubmit="return confirm('Tem certeza que deseja excluir este usuário?')">
+<button title="Excluir">🗑️</button>
+</form>
+<form action="/desvincular/{{ u.id }}" method="post"><button title="Desvincular">🔓</button></form></td>
+</tr>
+            {% endfor %}
+        </tbody>
+</table>
+</body>
+</html>
