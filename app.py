@@ -9,7 +9,7 @@ CORS(app)
 
 # ✅ URL do banco (Render.com ou variável local)
 DATABASE_URL = os.environ.get("DATABASE_URL")
-API_KEY_ESPERADA = "SUA_API_KEY_AQUI"
+API_KEY_ESPERADA = os.environ.get("API_KEY_ESPERADA", "SUA_API_KEY_AQUI")  # pode vir de env
 
 # ✅ Função para obter conexão PostgreSQL
 def get_conn():
@@ -190,7 +190,7 @@ def logout():
 def index():
     headers = {"Authorization": f"Bearer {API_KEY_ESPERADA}"}
     try:
-        resp = requests.get("https://painel-admin.onrender.com/usuarios", headers=headers)
+        resp = requests.get(request.url_root + "usuarios", headers=headers)
         usuarios = resp.json() if resp.status_code == 200 else []
     except Exception:
         usuarios = []
@@ -198,28 +198,26 @@ def index():
 
 @app.route("/aprovar/<int:usuario_id>", methods=["POST"])
 def aprovar_web(usuario_id):
-    requests.post("https://painel-admin.onrender.com/aprovar", json={"id": usuario_id}, headers={"Authorization": f"Bearer {API_KEY_ESPERADA}"})
+    requests.post(request.url_root + "aprovar", json={"id": usuario_id}, headers={"Authorization": f"Bearer {API_KEY_ESPERADA}"})
     return redirect("/")
 
 @app.route("/rejeitar/<int:usuario_id>", methods=["POST"])
 def rejeitar_web(usuario_id):
-    requests.post("https://painel-admin.onrender.com/rejeitar", json={"id": usuario_id}, headers={"Authorization": f"Bearer {API_KEY_ESPERADA}"})
+    requests.post(request.url_root + "rejeitar", json={"id": usuario_id}, headers={"Authorization": f"Bearer {API_KEY_ESPERADA}"})
     return redirect("/")
 
 @app.route("/resetar/<int:usuario_id>", methods=["POST"])
 def resetar_web(usuario_id):
-    resp = requests.post("https://painel-admin.onrender.com/reset_senha", json={"id": usuario_id}, headers={"Authorization": f"Bearer {API_KEY_ESPERADA}"})
+    resp = requests.post(request.url_root + "reset_senha", json={"id": usuario_id}, headers={"Authorization": f"Bearer {API_KEY_ESPERADA}"})
     nova_senha = resp.json().get("nova_senha", "Erro ao gerar")
     return f"<h3>Nova senha: {nova_senha}</h3><a href='/'>Voltar</a>"
 
 @app.route("/excluir/<int:usuario_id>", methods=["POST"])
 def excluir_web(usuario_id):
-    requests.post("https://painel-admin.onrender.com/excluir", json={"id": usuario_id}, headers={"Authorization": f"Bearer {API_KEY_ESPERADA}"})
+    requests.post(request.url_root + "excluir", json={"id": usuario_id}, headers={"Authorization": f"Bearer {API_KEY_ESPERADA}"})
     return redirect("/")
 
 @app.route("/desvincular/<int:usuario_id>", methods=["POST"])
 def desvincular_web(usuario_id):
-    requests.post("https://painel-admin.onrender.com/desvincular", json={"id": usuario_id}, headers={"Authorization": f"Bearer {API_KEY_ESPERADA}"})
+    requests.post(request.url_root + "desvincular", json={"id": usuario_id}, headers={"Authorization": f"Bearer {API_KEY_ESPERADA}"})
     return redirect("/")
-
-# ❌ Removido o bloco app.run para ambiente de produção com gunicorn
