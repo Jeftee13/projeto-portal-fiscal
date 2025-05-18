@@ -2,17 +2,20 @@ from flask import Flask, request, jsonify, render_template, redirect
 from flask_cors import CORS
 import psycopg2
 import os
+import requests
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
 CORS(app)
 
-# ✅ Configurações de ambiente
+# ✅ Variáveis de ambiente
 DATABASE_URL = os.environ.get("DATABASE_URL")
 API_KEY_ESPERADA = os.environ.get("API_KEY_ESPERADA", "SUA_API_KEY_AQUI")
 
+# ✅ Conexão com PostgreSQL
 def get_conn():
     return psycopg2.connect(DATABASE_URL)
 
+# ✅ Criação da tabela se não existir
 def init_db():
     conn = get_conn()
     cursor = conn.cursor()
@@ -32,6 +35,7 @@ def init_db():
     conn.commit()
     conn.close()
 
+# ✅ Verificação de API Key
 def validar_token(req):
     token = req.headers.get("Authorization", "").replace("Bearer ", "")
     return token == API_KEY_ESPERADA
@@ -48,8 +52,10 @@ def listar_usuarios():
     rows = cursor.fetchall()
     conn.close()
     usuarios = [
-        {"id": r[0], "nome": r[1], "email": r[2], "empresa": r[3],
-         "plano": r[4], "status": r[5], "senha": r[6], "id_maquina": r[7]}
+        {
+            "id": r[0], "nome": r[1], "email": r[2], "empresa": r[3],
+            "plano": r[4], "status": r[5], "senha": r[6], "id_maquina": r[7]
+        }
         for r in rows
     ]
     return jsonify(usuarios)
@@ -178,12 +184,10 @@ def logout():
     conn.close()
     return jsonify({"msg": "Logout realizado com sucesso"})
 
-# ============ ROTA PRINCIPAL CORRIGIDA ============
+# ============ ROTAS DO PAINEL ADMIN ============
 
 @app.route("/")
 def index():
-    if not validar_token(request):
-        return "Não autorizado", 403
     try:
         conn = get_conn()
         cursor = conn.cursor()
@@ -199,3 +203,29 @@ def index():
         print("Erro ao buscar usuários:", e)
         usuarios = []
     return render_template("index.html", usuarios=usuarios)
+
+@app.route("/aprovar/<int:usuario_id>", methods=["POST"])
+def aprovar_web(usuario_id):
+    requests.post(request.url_root + "aprovar", json={"id": usuario_id}, headers={"Authorization": f"Bearer {API_KEY_ESPERADA}"})
+    return redirect("/")
+
+@app.route("/rejeitar/<int:usuario_id>", methods=["POST"])
+def rejeitar_web(usuario_id):
+    requests.post(request.url_root + "rejeitar", json={"id": usuario_id}, headers={"Authorization": f"Bearer {API_KEY_ESPERADA}"})
+    return redirect("/")
+
+@app.route("/resetar/<int:usuario_id>", methods=["POST"])
+def resetar_web(usuario_id):
+    resp = requests.post(request.url_root + "reset_senha", json={"id": usuario_id}, headers={"Authorization": f"Bearer {API_KEY_ESPERADA}"})
+    nova_senha = resp.json().get("nova_senha", "Erro ao gerar")
+    return f"<h3>Nova senha: {nova_senha}</h3><a href='/'>Voltar</a>"
+
+@app.route("/excluir/<int:usuario_id>", methods=["POST"])
+def excluir_web(usuario_id):
+    requests.post(request.url_root + "excluir", json={"id": usuario_id}, headers={"Authorization": f"Bearer {API_KEY_ESPERADA}"})
+    return redirect("/")
+
+@app.route("/desvincular/<int:usuario_id>", methods=["POST"])
+def desvincular_web(usuario_id):
+    requests.post(request.url_root + "desvincular", json={"id": usuario_id}, headers={"Authorization": f"Bearer {API_KEY_ESPERADA}"})
+    return redirect("/")
