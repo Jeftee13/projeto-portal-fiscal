@@ -204,8 +204,10 @@ def index():
         usuarios = []
     return render_template("index.html", usuarios=usuarios)
 
-@app.route("/aprovar/<int:usuario_id>", methods=["POST"])
+@app.route("/aprovar/<int:usuario_id>", methods=["POST", "GET"])
 def aprovar_web(usuario_id):
+    if request.method != "POST":
+        return "❌ Método inválido. Use POST.", 405
     requests.post(request.url_root + "aprovar", json={"id": usuario_id}, headers={"Authorization": f"Bearer {API_KEY_ESPERADA}"})
     return redirect("/")
 
