@@ -2,20 +2,17 @@ from flask import Flask, request, jsonify, render_template, redirect
 from flask_cors import CORS
 import psycopg2
 import os
-import requests
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
 CORS(app)
 
-# ✅ URL do banco (Render.com ou variável local)
+# ✅ Configurações de ambiente
 DATABASE_URL = os.environ.get("DATABASE_URL")
-API_KEY_ESPERADA = os.environ.get("API_KEY_ESPERADA", "SUA_API_KEY_AQUI")  # pode vir de env
+API_KEY_ESPERADA = os.environ.get("API_KEY_ESPERADA", "SUA_API_KEY_AQUI")
 
-# ✅ Função para obter conexão PostgreSQL
 def get_conn():
     return psycopg2.connect(DATABASE_URL)
 
-# ✅ Criação de tabela inicial
 def init_db():
     conn = get_conn()
     cursor = conn.cursor()
@@ -35,7 +32,6 @@ def init_db():
     conn.commit()
     conn.close()
 
-# ✅ Token de segurança
 def validar_token(req):
     token = req.headers.get("Authorization", "").replace("Bearer ", "")
     return token == API_KEY_ESPERADA
@@ -52,10 +48,8 @@ def listar_usuarios():
     rows = cursor.fetchall()
     conn.close()
     usuarios = [
-        {
-            "id": r[0], "nome": r[1], "email": r[2], "empresa": r[3],
-            "plano": r[4], "status": r[5], "senha": r[6], "id_maquina": r[7]
-        }
+        {"id": r[0], "nome": r[1], "email": r[2], "empresa": r[3],
+         "plano": r[4], "status": r[5], "senha": r[6], "id_maquina": r[7]}
         for r in rows
     ]
     return jsonify(usuarios)
@@ -184,40 +178,24 @@ def logout():
     conn.close()
     return jsonify({"msg": "Logout realizado com sucesso"})
 
-# ============ ROTAS DO PAINEL ADMIN ============
+# ============ ROTA PRINCIPAL CORRIGIDA ============
 
 @app.route("/")
 def index():
-    headers = {"Authorization": f"Bearer {API_KEY_ESPERADA}"}
+    if not validar_token(request):
+        return "Não autorizado", 403
     try:
-        resp = requests.get(request.url_root + "usuarios", headers=headers)
-        usuarios = resp.json() if resp.status_code == 200 else []
-    except Exception:
+        conn = get_conn()
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, nome, email, empresa, plano, status, senha, id_maquina FROM usuarios")
+        rows = cursor.fetchall()
+        conn.close()
+        usuarios = [
+            {"id": r[0], "nome": r[1], "email": r[2], "empresa": r[3],
+             "plano": r[4], "status": r[5], "senha": r[6], "id_maquina": r[7]}
+            for r in rows
+        ]
+    except Exception as e:
+        print("Erro ao buscar usuários:", e)
         usuarios = []
     return render_template("index.html", usuarios=usuarios)
-
-@app.route("/aprovar/<int:usuario_id>", methods=["POST"])
-def aprovar_web(usuario_id):
-    requests.post(request.url_root + "aprovar", json={"id": usuario_id}, headers={"Authorization": f"Bearer {API_KEY_ESPERADA}"})
-    return redirect("/")
-
-@app.route("/rejeitar/<int:usuario_id>", methods=["POST"])
-def rejeitar_web(usuario_id):
-    requests.post(request.url_root + "rejeitar", json={"id": usuario_id}, headers={"Authorization": f"Bearer {API_KEY_ESPERADA}"})
-    return redirect("/")
-
-@app.route("/resetar/<int:usuario_id>", methods=["POST"])
-def resetar_web(usuario_id):
-    resp = requests.post(request.url_root + "reset_senha", json={"id": usuario_id}, headers={"Authorization": f"Bearer {API_KEY_ESPERADA}"})
-    nova_senha = resp.json().get("nova_senha", "Erro ao gerar")
-    return f"<h3>Nova senha: {nova_senha}</h3><a href='/'>Voltar</a>"
-
-@app.route("/excluir/<int:usuario_id>", methods=["POST"])
-def excluir_web(usuario_id):
-    requests.post(request.url_root + "excluir", json={"id": usuario_id}, headers={"Authorization": f"Bearer {API_KEY_ESPERADA}"})
-    return redirect("/")
-
-@app.route("/desvincular/<int:usuario_id>", methods=["POST"])
-def desvincular_web(usuario_id):
-    requests.post(request.url_root + "desvincular", json={"id": usuario_id}, headers={"Authorization": f"Bearer {API_KEY_ESPERADA}"})
-    return redirect("/")
