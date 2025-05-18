@@ -2,20 +2,19 @@ from flask import Flask, request, jsonify, render_template, redirect
 from flask_cors import CORS
 import psycopg2
 import os
-import requests
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
 CORS(app)
 
-# ✅ Variáveis de ambiente
+# 🔐 Variáveis de ambiente
 DATABASE_URL = os.environ.get("DATABASE_URL")
 API_KEY_ESPERADA = os.environ.get("API_KEY_ESPERADA", "SUA_API_KEY_AQUI")
 
-# ✅ Conexão com PostgreSQL
+# 🔌 Conexão com PostgreSQL
 def get_conn():
     return psycopg2.connect(DATABASE_URL)
 
-# ✅ Criação da tabela se não existir
+# 🧱 Criação da tabela
 def init_db():
     conn = get_conn()
     cursor = conn.cursor()
@@ -35,12 +34,12 @@ def init_db():
     conn.commit()
     conn.close()
 
-# ✅ Verificação de API Key
+# 🔐 Validação de token
 def validar_token(req):
     token = req.headers.get("Authorization", "").replace("Bearer ", "")
     return token == API_KEY_ESPERADA
 
-# ============ ROTAS DE API ============
+# ========== ROTAS DE API ==========
 
 @app.route("/usuarios", methods=["GET"])
 def listar_usuarios():
@@ -52,10 +51,8 @@ def listar_usuarios():
     rows = cursor.fetchall()
     conn.close()
     usuarios = [
-        {
-            "id": r[0], "nome": r[1], "email": r[2], "empresa": r[3],
-            "plano": r[4], "status": r[5], "senha": r[6], "id_maquina": r[7]
-        }
+        {"id": r[0], "nome": r[1], "email": r[2], "empresa": r[3], "plano": r[4],
+         "status": r[5], "senha": r[6], "id_maquina": r[7]}
         for r in rows
     ]
     return jsonify(usuarios)
@@ -184,7 +181,7 @@ def logout():
     conn.close()
     return jsonify({"msg": "Logout realizado com sucesso"})
 
-# ============ ROTAS DO PAINEL ADMIN ============
+# ========== ROTAS DO PAINEL ADMIN (web) ==========
 
 @app.route("/")
 def index():
@@ -204,30 +201,43 @@ def index():
         usuarios = []
     return render_template("index.html", usuarios=usuarios)
 
-@app.route("/aprovar/<int:usuario_id>", methods=["POST", "GET"])
+@app.route("/aprovar/<int:usuario_id>", methods=["POST"])
 def aprovar_web(usuario_id):
-    if request.method != "POST":
-        return "❌ Método inválido. Use POST.", 405
-    requests.post(request.url_root + "aprovar", json={"id": usuario_id}, headers={"Authorization": f"Bearer {API_KEY_ESPERADA}"})
+    conn = get_conn()
+    cursor = conn.cursor()
+    cursor.execute("UPDATE usuarios SET status='aprovado' WHERE id=%s", (usuario_id,))
+    conn.commit()
+    conn.close()
     return redirect("/")
 
 @app.route("/rejeitar/<int:usuario_id>", methods=["POST"])
 def rejeitar_web(usuario_id):
-    requests.post(request.url_root + "rejeitar", json={"id": usuario_id}, headers={"Authorization": f"Bearer {API_KEY_ESPERADA}"})
+    conn = get_conn()
+    cursor = conn.cursor()
+    cursor.execute("UPDATE usuarios SET status='rejeitado' WHERE id=%s", (usuario_id,))
+    conn.commit()
+    conn.close()
     return redirect("/")
 
 @app.route("/resetar/<int:usuario_id>", methods=["POST"])
 def resetar_web(usuario_id):
-    resp = requests.post(request.url_root + "reset_senha", json={"id": usuario_id}, headers={"Authorization": f"Bearer {API_KEY_ESPERADA}"})
-    nova_senha = resp.json().get("nova_senha", "Erro ao gerar")
+    nova_senha = "senha" + str(usuario_id).zfill(4)
     return f"<h3>Nova senha: {nova_senha}</h3><a href='/'>Voltar</a>"
 
 @app.route("/excluir/<int:usuario_id>", methods=["POST"])
 def excluir_web(usuario_id):
-    requests.post(request.url_root + "excluir", json={"id": usuario_id}, headers={"Authorization": f"Bearer {API_KEY_ESPERADA}"})
+    conn = get_conn()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM usuarios WHERE id=%s", (usuario_id,))
+    conn.commit()
+    conn.close()
     return redirect("/")
 
 @app.route("/desvincular/<int:usuario_id>", methods=["POST"])
 def desvincular_web(usuario_id):
-    requests.post(request.url_root + "desvincular", json={"id": usuario_id}, headers={"Authorization": f"Bearer {API_KEY_ESPERADA}"})
+    conn = get_conn()
+    cursor = conn.cursor()
+    cursor.execute("UPDATE usuarios SET id_maquina = NULL, logado = 0 WHERE id=%s", (usuario_id,))
+    conn.commit()
+    conn.close()
     return redirect("/")
