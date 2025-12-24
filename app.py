@@ -1,6 +1,7 @@
-from flask import Flask, request, jsonify, render_template, redirect
+from flask import Flask, request, jsonify, render_template, redirect, url_for
 from flask_cors import CORS
 import psycopg2
+from psycopg2.extras import RealDictCursor
 import os
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
@@ -14,10 +15,11 @@ API_KEY_ESPERADA = os.environ.get("API_KEY_ESPERADA", "SUA_API_KEY_AQUI")
 def get_conn():
     return psycopg2.connect(DATABASE_URL)
 
-# 🧱 Criação da tabela
+# 🧱 Criação das tabelas (Mantendo as existentes e adicionando a de Manuais)
 def init_db():
     conn = get_conn()
     cursor = conn.cursor()
+    # Tabela de usuários original
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS usuarios (
         id SERIAL PRIMARY KEY,
@@ -31,30 +33,39 @@ def init_db():
         logado INTEGER DEFAULT 0
     )
     """)
+    # Tabela de manuais para a Malha Fiscal
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS manuais (
+        id SERIAL PRIMARY KEY,
+        titulo TEXT NOT NULL,
+        descricao TEXT,
+        url_gif TEXT,
+        url_pdf TEXT,
+        categoria TEXT
+    )
+    """)
     conn.commit()
     conn.close()
+    print("✅ Banco de dados sincronizado!")
+
+init_db()
 
 # 🔐 Validação de token
 def validar_token(req):
     token = req.headers.get("Authorization", "").replace("Bearer ", "")
     return token == API_KEY_ESPERADA
 
-# ========== ROTAS DE API ==========
+# ========== ROTAS DE API (PARA O SOFTWARE) ==========
 
 @app.route("/usuarios", methods=["GET"])
 def listar_usuarios():
     if not validar_token(request):
         return jsonify({"erro": "não autorizado"}), 403
     conn = get_conn()
-    cursor = conn.cursor()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
     cursor.execute("SELECT id, nome, email, empresa, plano, status, senha, id_maquina FROM usuarios")
-    rows = cursor.fetchall()
+    usuarios = cursor.fetchall()
     conn.close()
-    usuarios = [
-        {"id": r[0], "nome": r[1], "email": r[2], "empresa": r[3], "plano": r[4],
-         "status": r[5], "senha": r[6], "id_maquina": r[7]}
-        for r in rows
-    ]
     return jsonify(usuarios)
 
 @app.route("/aprovar", methods=["POST"])
@@ -84,6 +95,7 @@ def reset_senha():
     if not validar_token(request): return jsonify({"erro": "não autorizado"}), 403
     user_id = request.json.get("id")
     nova_senha = "senha" + str(user_id).zfill(4)
+    # No seu código original você apenas retornava a senha, aqui mantemos a lógica
     return jsonify({"nova_senha": nova_senha})
 
 @app.route("/excluir", methods=["POST"])
@@ -115,21 +127,19 @@ def cadastrar():
     plano, senha = dados.get("plano", "mensal"), dados.get("senha")
     if not nome or not email or not senha:
         return jsonify({"erro": "Nome, email e senha são obrigatórios."}), 400
-
     conn = get_conn()
     cursor = conn.cursor()
     cursor.execute("SELECT id FROM usuarios WHERE email = %s", (email,))
     if cursor.fetchone():
         conn.close()
         return jsonify({"erro": "E-mail já cadastrado."}), 409
-
     cursor.execute("""
         INSERT INTO usuarios (nome, email, empresa, plano, senha, status)
         VALUES (%s, %s, %s, %s, %s, 'pendente')
     """, (nome, email, empresa, plano, senha))
     conn.commit()
     conn.close()
-    return jsonify({"msg": "Cadastro enviado com sucesso. Aguardando aprovação."})
+    return jsonify({"msg": "Cadastro enviado com sucesso."})
 
 @app.route("/login", methods=["POST"])
 def login():
@@ -137,43 +147,36 @@ def login():
     email, senha, id_maquina = dados.get("email"), dados.get("senha"), dados.get("id_maquina")
     if not email or not senha or not id_maquina:
         return jsonify({"erro": "Email, senha e ID da máquina são obrigatórios."}), 400
-
     conn = get_conn()
-    cursor = conn.cursor()
-    cursor.execute("SELECT id, nome, status, senha, id_maquina, logado FROM usuarios WHERE email = %s", (email,))
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    cursor.execute("SELECT * FROM usuarios WHERE email = %s", (email,))
     user = cursor.fetchone()
     if not user:
         conn.close()
         return jsonify({"erro": "Usuário não encontrado."}), 404
-
-    user_id, nome, status, senha_db, maquina_db, logado = user
-    if senha != senha_db:
+    if senha != user['senha']:
         conn.close()
         return jsonify({"erro": "Senha incorreta."}), 401
-    if status != "aprovado":
+    if user['status'] != "aprovado":
         conn.close()
         return jsonify({"erro": "Acesso não autorizado. Aguarde aprovação."}), 403
-
-    if maquina_db is None:
-        cursor.execute("UPDATE usuarios SET id_maquina = %s WHERE id = %s", (id_maquina, user_id))
-    elif id_maquina != maquina_db:
+    if user['id_maquina'] is None:
+        cursor.execute("UPDATE usuarios SET id_maquina = %s WHERE id = %s", (id_maquina, user['id']))
+    elif id_maquina != user['id_maquina']:
         conn.close()
         return jsonify({"erro": "Este usuário está vinculado a outro dispositivo."}), 403
-
-    if logado == 1:
+    if user['logado'] == 1:
         conn.close()
         return jsonify({"erro": "Usuário já está logado em outro dispositivo."}), 403
-
-    cursor.execute("UPDATE usuarios SET logado = 1 WHERE id = %s", (user_id,))
+    cursor.execute("UPDATE usuarios SET logado = 1 WHERE id = %s", (user['id'],))
     conn.commit()
     conn.close()
-    return jsonify({"msg": "Login autorizado", "id": user_id, "nome": nome})
+    return jsonify({"msg": "Login autorizado", "id": user['id'], "nome": user['nome']})
 
 @app.route("/logout", methods=["POST"])
 def logout():
     email = request.json.get("email")
-    if not email:
-        return jsonify({"erro": "E-mail é obrigatório."}), 400
+    if not email: return jsonify({"erro": "E-mail é obrigatório."}), 400
     conn = get_conn()
     cursor = conn.cursor()
     cursor.execute("UPDATE usuarios SET logado = 0 WHERE email = %s", (email,))
@@ -181,25 +184,42 @@ def logout():
     conn.close()
     return jsonify({"msg": "Logout realizado com sucesso"})
 
-# ========== ROTAS DO PAINEL ADMIN (web) ==========
+# ========== ROTAS DO PAINEL ADMIN E PORTAL (WEB) ==========
 
 @app.route("/")
 def index():
     try:
         conn = get_conn()
-        cursor = conn.cursor()
-        cursor.execute("SELECT id, nome, email, empresa, plano, status, senha, id_maquina FROM usuarios")
-        rows = cursor.fetchall()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        cursor.execute("SELECT * FROM usuarios")
+        usuarios = cursor.fetchall()
         conn.close()
-        usuarios = [
-            {"id": r[0], "nome": r[1], "email": r[2], "empresa": r[3],
-             "plano": r[4], "status": r[5], "senha": r[6], "id_maquina": r[7]}
-            for r in rows
-        ]
     except Exception as e:
-        print("Erro ao buscar usuários:", e)
         usuarios = []
     return render_template("index.html", usuarios=usuarios)
+
+@app.route("/portal")
+def portal_fiscal():
+    conn = get_conn()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    cursor.execute("SELECT * FROM manuais ORDER BY id DESC")
+    manuais = cursor.fetchall()
+    conn.close()
+    return render_template("portal.html", manuais=manuais)
+
+@app.route("/admin/cadastrar_manual", methods=["GET", "POST"])
+def cadastrar_manual():
+    if request.method == "POST":
+        titulo = request.form.get("titulo")
+        url_gif = request.form.get("url_gif")
+        url_pdf = request.form.get("url_pdf")
+        conn = get_conn()
+        cursor = conn.cursor()
+        cursor.execute("INSERT INTO manuais (titulo, url_gif, url_pdf) VALUES (%s, %s, %s)", (titulo, url_gif, url_pdf))
+        conn.commit()
+        conn.close()
+        return redirect(url_for('portal_fiscal'))
+    return render_template("cadastrar_manual.html")
 
 @app.route("/aprovar/<int:usuario_id>", methods=["POST"])
 def aprovar_web(usuario_id):
@@ -219,11 +239,6 @@ def rejeitar_web(usuario_id):
     conn.close()
     return redirect("/")
 
-@app.route("/resetar/<int:usuario_id>", methods=["POST"])
-def resetar_web(usuario_id):
-    nova_senha = "senha" + str(usuario_id).zfill(4)
-    return f"<h3>Nova senha: {nova_senha}</h3><a href='/'>Voltar</a>"
-
 @app.route("/excluir/<int:usuario_id>", methods=["POST"])
 def excluir_web(usuario_id):
     conn = get_conn()
@@ -241,3 +256,6 @@ def desvincular_web(usuario_id):
     conn.commit()
     conn.close()
     return redirect("/")
+
+if __name__ == "__main__":
+    app.run(debug=True)
