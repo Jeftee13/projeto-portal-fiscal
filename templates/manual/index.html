@@ -1,0 +1,340 @@
+{% extends "base.html" %} {% block content %}
+
+<style>
+  /* Barra superior (contador + ações) */
+  .toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 14px;
+  }
+
+  .toolbar .left {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+
+  .toolbar .count {
+    font-weight: 800;
+  }
+
+  .toolbar .actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .btn-ghost {
+    border: 1px solid rgba(255, 215, 0, 0.22);
+    background: transparent;
+    color: var(--gold);
+    padding: 10px 12px;
+    border-radius: 10px;
+    cursor: pointer;
+    text-decoration: none;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .btn-primary {
+    border: 1px solid rgba(255, 215, 0, 0.35);
+    background: rgba(255, 215, 0, 0.85);
+    color: #000;
+    padding: 10px 14px;
+    border-radius: 10px;
+    cursor: pointer;
+    text-decoration: none;
+    font-weight: 900;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  /* Linha de filtros */
+  .filters {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+
+  .filters .field {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .filters input,
+  .filters select {
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 215, 0, 0.22);
+    background: #0f0f0f;
+    color: #fff;
+    outline: none;
+    min-width: 240px;
+  }
+
+  .filters select {
+    min-width: 220px;
+  }
+
+  /* Tabela */
+  .table-wrap {
+    border: 1px solid rgba(255, 215, 0, 0.18);
+    border-radius: 14px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    margin-top: 6px;
+  }
+
+  table.client-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .client-table thead th {
+    text-align: left;
+    font-size: 13px;
+    padding: 12px 12px;
+    border-bottom: 1px solid rgba(255, 215, 0, 0.14);
+    background: rgba(255, 255, 255, 0.02);
+    opacity: 0.95;
+    white-space: nowrap;
+    user-select: none;
+    cursor: pointer;
+  }
+
+  .client-table tbody td {
+    padding: 12px 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    font-size: 13px;
+    white-space: nowrap;
+    vertical-align: middle;
+  }
+
+  .client-table tbody tr:hover {
+    background: rgba(255, 215, 0, 0.05);
+  }
+
+  .client-table .muted {
+    opacity: 0.85;
+  }
+
+  .sort-ind {
+    opacity: 0.6;
+    font-weight: 900;
+    margin-left: 6px;
+    font-size: 11px;
+  }
+
+  /* Checkbox coluna */
+  .col-check {
+    width: 38px;
+    cursor: default !important;
+  }
+  .col-codigo {
+    width: 90px;
+  }
+  .col-cnpj {
+    width: 170px;
+  }
+  .col-regime {
+    width: 180px;
+  }
+  .col-resp {
+    width: 200px;
+  }
+
+  /* Clique na linha */
+  tr.clickable-row {
+    cursor: pointer;
+  }
+</style>
+
+<div class="card wide">
+  <div
+    style="
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+      flex-wrap: wrap;
+    "
+  >
+    <div>
+      <h2 style="margin: 0">Clientes</h2>
+      <div style="color:#ff4d4d; font-weight:900; margin-top:6px;">
+  VERSÃO NOVA DO MANUAL/INDEX
+</div>
+      <small class="muted">
+        Cadastre por planilha (.xlsx) ou manualmente. Clique em um cliente para
+        abrir o manual.
+      </small>
+    </div>
+  </div>
+
+<div class="toolbar" style="margin-top: 14px">
+  <div class="left">
+    <div class="count" id="clientCountTop">
+      {% if pagination %}{{ pagination.total }} Clientes{% else %}{{ clients|length }} Clientes{% endif %}
+    </div>
+
+    <div class="actions">
+      <a class="btn-ghost" href="{{ url_for('manual.import_xlsx') }}">⬆ Importar</a>
+
+      <a class="btn-ghost" 
+         href="{{ url_for('manual.export_xlsx', q=request.args.get('q', ''), regime=request.args.get('regime', '')) }}" 
+         download="clientes_export.xlsx">
+        ⬇ Exportar lista
+      </a>
+    </div>
+  </div>
+
+  <div class="actions">
+    <a class="btn-primary" href="{{ url_for('manual.new_client') }}">＋ Novo</a>
+  </div>
+</div>
+
+
+
+  <!-- Filtros -->
+  <form class="filters" method="get" action="{{ url_for('manual.index') }}">
+  <div class="field" style="flex:1;">
+    <input
+      name="q"
+      type="text"
+      placeholder="Pesquisar por Razão Social, CNPJ ou Responsável..."
+      value="{{ q or '' }}"
+      style="width: min(520px, 100%);"
+    />
+  </div>
+
+  <div class="field">
+    <input
+      name="regime"
+      type="text"
+      placeholder="Regime (opcional)"
+      value="{{ regime or '' }}"
+      style="min-width: 220px;"
+    />
+  </div>
+
+  <div class="field">
+    <select name="per_page" style="min-width: 160px;">
+      {% for n in [10, 20, 50, 100] %}
+        <option value="{{ n }}" {% if per_page == n %}selected{% endif %}>{{ n }} / pág</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <div class="field">
+    <button class="btn-ghost" type="submit">Filtrar</button>
+    <a class="btn-ghost" href="{{ url_for('manual.index') }}">Limpar</a>
+  </div>
+
+  {% if pagination %}
+    <div class="field">
+      <small class="muted">
+        Mostrando {{ clients|length }} de {{ pagination.total }} (pág. {{ pagination.page }}/{{ pagination.pages }})
+      </small>
+    </div>
+  {% endif %}
+</form>
+
+  <!-- Tabela -->
+  <div class="table-wrap">
+    <table class="client-table" id="clientTable">
+      <thead>
+        <tr>
+          <th class="col-check" data-nosort="1"></th>
+          <th class="col-codigo" data-sort="codigo">
+            Código <span class="sort-ind" id="ind-codigo">↕</span>
+          </th>
+          <th data-sort="razao">
+            Nome <span class="sort-ind" id="ind-razao">↕</span>
+          </th>
+          <th class="col-cnpj" data-sort="cnpj">
+            Documento de identificação
+            <span class="sort-ind" id="ind-cnpj">↕</span>
+          </th>
+          <th class="col-regime" data-sort="regime">
+            Regime Federal <span class="sort-ind" id="ind-regime">↕</span>
+          </th>
+          <th class="col-resp" data-sort="resp">
+            Responsável Fiscal <span class="sort-ind" id="ind-resp">↕</span>
+          </th>
+        </tr>
+      </thead>
+      <tbody id="clientTbody">
+        {% for c in clients %}
+        <tr
+          class="clickable-row"
+          data-razao="{{ (c.razao_social or '')|lower }}"
+          data-cnpj="{{ (c.cnpj or '')|lower }}"
+          data-regime="{{ (c.regime_tributario or '')|lower }}"
+          data-resp="{{ (c.responsavel_fiscal or '')|lower }}"
+          data-href="{{ url_for('manual.client_detail', client_id=c.id) }}"
+        >
+          <td class="col-check" onclick="event.stopPropagation();">
+            <input type="checkbox" />
+          </td>
+          <td class="col-codigo">{{ c.id }}</td>
+          <td style="font-weight: 800">{{ c.razao_social }}</td>
+          <td>{{ c.cnpj }}</td>
+          <td>{{ c.regime_tributario }}</td>
+          <td>{{ c.responsavel_fiscal }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+   {% if pagination and (pagination.pages > 1) %}
+  <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-top:12px;">
+    <div class="muted" style="font-size:13px;">
+      Total: {{ pagination.total }} cliente(s)
+    </div>
+
+    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+      {% if pagination.has_prev %}
+        <a class="btn-ghost"
+           href="{{ url_for('manual.index', page=pagination.prev_num, q=q, regime=regime, per_page=per_page) }}">
+          ← Anterior
+        </a>
+      {% endif %}
+
+      {% if pagination.has_next %}
+        <a class="btn-ghost"
+           href="{{ url_for('manual.index', page=pagination.next_num, q=q, regime=regime, per_page=per_page) }}">
+          Próxima →
+        </a>
+      {% endif %}
+    </div>
+  </div>
+{% endif %} 
+  {% if not clients %}
+  <p style="margin-top: 12px">Nenhuma empresa cadastrada ainda.</p>
+  {% endif %}
+</div>
+
+<script>
+  // clique na linha -> abre detalhe
+  document.addEventListener("DOMContentLoaded", () => {
+    document.querySelectorAll("tr.clickable-row").forEach((tr) => {
+      tr.addEventListener("click", () => {
+        const href = tr.getAttribute("data-href");
+        if (href) window.location.href = href;
+      });
+    });
+  });
+</script>
+
+{% endblock %}

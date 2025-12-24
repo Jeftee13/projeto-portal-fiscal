@@ -1,0 +1,72 @@
+:root {
+  --bg: #0b0b0c;
+  --panel: #121214;
+  --gold: #d4af37;
+  --text: #f2f2f2;
+  --muted: #b7b7b7;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, Arial;
+  margin: 0;
+}
+.navbar {
+  background: #000;
+  border-bottom: 1px solid rgba(212, 175, 55, 0.35);
+  padding: 14px 18px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+a {
+  color: var(--gold);
+  text-decoration: none;
+}
+.card {
+  background: var(--panel);
+  border: 1px solid rgba(212, 175, 55, 0.25);
+  border-radius: 14px;
+  padding: 16px;
+}
+input {
+  background: #0f0f10;
+  color: var(--text);
+  border: 1px solid rgba(212, 175, 55, 0.18);
+  padding: 10px;
+  width: 100%;
+  border-radius: 10px;
+}
+button {
+  background: var(--gold);
+  border: none;
+  color: #000;
+  font-weight: 800;
+  padding: 10px 12px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+small {
+  color: var(--muted);
+}
+.container {
+  max-width: 1000px;
+  margin: 20px auto;
+  padding: 0 14px;
+}
+.alert {
+  border: 1px solid rgba(212, 175, 55, 0.25);
+  background: rgba(212, 175, 55, 0.08);
+  padding: 10px 12px;
+  border-radius: 12px;
+  margin-bottom: 10px;
+}
+/* ====== FULL WIDTH (somente quando o container tiver .wide) ====== */
+.container.wide {
+  max-width: none !important;
+  width: 100% !important;
+  margin: 24px 0 !important;
+  padding-left: 24px; /* ajuste se quiser mais/menos espaço */
+  padding-right: 24px;
+}

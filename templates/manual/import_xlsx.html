@@ -1,0 +1,30 @@
+{% extends "base.html" %} {% block content %}
+
+<div class="card">
+  <h2 style="margin-top: 0">Importar clientes (.xlsx)</h2>
+
+  <form method="post" enctype="multipart/form-data">
+    <div style="margin: 12px 0">
+      <input type="file" name="file" accept=".xlsx" required />
+    </div>
+
+    <label
+      style="display: flex; gap: 10px; align-items: center; margin: 10px 0"
+    >
+      <input type="checkbox" name="atualizar" value="1" />
+      Atualizar clientes existentes (mesmo CNPJ)
+    </label>
+
+    <button class="btn-primary" type="submit">Importar</button>
+    <a class="btn-ghost" href="{{ url_for('manual.index') }}">Voltar</a>
+  </form>
+
+  <hr style="opacity: 0.2; margin: 14px 0" />
+
+  <p class="muted" style="margin: 0">
+    Colunas esperadas: <b>Razão Social</b>, <b>CNPJ</b>,
+    <b>Regime Tributário</b>, <b>Responsável Fiscal</b>.
+  </p>
+</div>
+
+{% endblock %}

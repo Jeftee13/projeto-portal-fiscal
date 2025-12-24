@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Portal Fiscal</title>
+
+    <!-- CSS do tema -->
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='css/theme.css') }}"
+    />
+  </head>
+  <body>
+    <!-- Menu superior -->
+    <div class="navbar">
+      <div style="font-weight: 900">
+        <span style="color: var(--gold)">Portal</span> Fiscal
+      </div>
+
+      <div>
+        {% if current_user.is_authenticated %}
+        <a href="{{ url_for('home.index') }}">Home</a> ·
+        <a href="{{ url_for('manual.index') }}">Manual</a> ·
+        <a href="{{ url_for('processos.index') }}">Processos</a> · {% if
+        current_user.is_admin() %}
+        <a href="{{ url_for('admin.pending_users') }}">Pendentes</a> · {% endif
+        %}
+
+        <a href="{{ url_for('auth.logout') }}">Sair</a>
+        {% else %}
+        <a href="{{ url_for('auth.login') }}">Login</a> ·
+        <a href="{{ url_for('auth.register') }}">Cadastrar</a>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Conteúdo -->
+    <div
+      class="container {% if request.blueprint == 'manual' %}wide{% endif %}"
+    >
+      <!-- Mensagens -->
+      {% with msgs = get_flashed_messages(with_categories=true) %} {% if msgs %}
+      {% for cat, msg in msgs %}
+      <div class="alert"><b>{{ cat|upper }}</b> — {{ msg }}</div>
+      {% endfor %} {% endif %} {% endwith %}
+
+      <!-- Conteúdo específico da página -->
+      {% block content %}{% endblock %}
+    </div>
+  </body>
+</html>

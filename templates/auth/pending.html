@@ -1,0 +1,14 @@
+{% extends "base.html" %} {% block content %}
+<div class="card" style="max-width: 520px; margin: auto">
+  <h2 style="margin-top: 0">Cadastro pendente</h2>
+
+  <p>Seu cadastro foi enviado e está aguardando aprovação do administrador.</p>
+  <small
+    >Quando o administrador aprovar, você conseguirá fazer login
+    normalmente.</small
+  >
+
+  <div style="height: 14px"></div>
+  <a href="{{ url_for('auth.login') }}">Voltar para o login</a>
+</div>
+{% endblock %}
